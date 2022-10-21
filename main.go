@@ -51,7 +51,7 @@ func insertData() {
 
 func generateTestData(conn driver.Conn) error {
 	var orgIds []string
-	for i := 0; i < 33_000; i++ {
+	for i := 0; i < 5_000; i++ {
 		orgIds = append(orgIds, uuid.NewString())
 	}
 	postgresVersions := []string{
@@ -94,6 +94,12 @@ func generateTestData(conn driver.Conn) error {
 		if err != nil {
 			return err
 		}
+
+		batch2, err := conn.PrepareBatch(context.Background(), `INSERT INTO telemetryd.pmm_metrics_2`)
+		if err != nil {
+			return err
+		}
+
 		version := postgresVersions[rand.Intn(len(postgresVersions))]
 		pmmVersion := pmmVersions[rand.Intn(len(pmmVersions))]
 		randCount := rand.Intn(100)
@@ -111,14 +117,69 @@ func generateTestData(conn driver.Conn) error {
 					{`pmm_server_backup_management_enabled`, `0`},
 					{`pmm_server_alert_manager_enabled`, `0`},
 					{`pmm_cpu_info_json`, fmt.Sprintf(`{"name": "cpu", "info": { "cpu_architecture": "%s","percent": %f } }`, cpuArchitectures[rand.Intn(len(cpuArchitectures))], rand.Float64()*100)},
-					{`pmm_cpu_info_json`, fmt.Sprintf(`{"name": "cpu", "info": { "cpu_architecture": "%s", "percent": %f } }`, cpuArchitectures[rand.Intn(len(cpuArchitectures))], rand.Float64()*100)},
-					{`pmm_cpu_info_json`, fmt.Sprintf(`{"name": "cpu", "info": { "cpu_architecture": "%s", "percent": %f } }`, cpuArchitectures[rand.Intn(len(cpuArchitectures))], rand.Float64()*100)},
 					{`pmm_another_info`, fmt.Sprintf(`{"name": "pmm", "info": { "count": %d} }`, randCount)},
 					{`pmm_server_info`, fmt.Sprintf(`{"name": "pmm","version": "%s"}`, pmmVersion)},
 					{`pmm_agents_status_info`, fmt.Sprintf(`{"name": "postgres","version": "%s"}`, version)},
 					{`pmm_agents_status_info_2`, fmt.Sprintf(`{"name": "mysql","version": "%s"}`, version)},
 					{`pmm_agents_status_info_3`, fmt.Sprintf(`{"name": "proxysql","version": "%s"}`, version)},
+					{`pmm_server_grafana_stat_active_users`,
+						`0`},
+					{`pmm_server_grafana_stat_totals_annotations`,
+						`0`},
+					{`pmm_server_data_retention_period`,
+						`2592000000000000`},
+					{`pmm_server_usage_nodes_count`,
+						`0`},
+					{`pmm_server_usage_services_count`,
+						`0`},
+					{`pmm_server_usage_environments_count`,
+						`0`},
+					{`pmm_server_usage_clusters_count`,
+						`0`},
+					{`pmm_server_pmm_agent_version`,
+						`2.32.0`},
+					{`pmm_server_node_type`,
+						`generic`},
+					{`dbaas_services_count`,
+						`0`},
+					{`dbaas_clusters_count`,
+						`0`},
+					{`k8s_clusters_count`,
+						`0`},
+					{`pmm_server_version`,
+						`2.30.0`},
+					{`pmm_server_uptime_seconds`,
+						`2790`},
+					{`pmm_server_deployment_method`,
+						`DOCKER`},
+					{`pmm_server_country`,
+						``},
+				},
+				[]string{},
+			)
+			if err != nil {
+				return err
+			}
+
+			err = batch2.Append(
+				uuid.NewString(),
+				date,
+				orgId,
+				nil,
+				"",
+				int32(1),
+				[][]string{
+					{`pmm_server_backup_management_enabled`, `0`},
+					{`pmm_server_alert_manager_enabled`, `0`},
+					{`pmm_cpu_info_json`, fmt.Sprintf(`{"name": "cpu", "info": { "cpu_architecture": "%s","percent": %f } }`, cpuArchitectures[rand.Intn(len(cpuArchitectures))], rand.Float64()*100)},
+					{`pmm_another_info`, fmt.Sprintf(`{"name": "pmm", "info": { "count": %d} }`, randCount)},
+					{`pmm_server_info`, fmt.Sprintf(`{"name": "pmm","version": "%s"}`, pmmVersion)},
+					{`pmm_agents_status_info`, fmt.Sprintf(`{"name": "postgres","version": "%s"}`, version)},
+					{`pmm_agents_status_info_2`, fmt.Sprintf(`{"name": "mysql","version": "%s"}`, version)},
+					{`pmm_agents_status_info_3`, fmt.Sprintf(`{"name": "proxysql","version": "%s"}`, version)},
+
 					{`pmm_cpu_info_text`, fmt.Sprintf(`cpu_architecture:%s,percent:%f`, cpuArchitectures[rand.Intn(len(cpuArchitectures))], rand.Float64()*100)},
+
 					{`pmm_server_grafana_stat_active_users`,
 						`0`},
 					{`pmm_server_grafana_stat_totals_annotations`,
@@ -160,6 +221,10 @@ func generateTestData(conn driver.Conn) error {
 			date = date.Add(24 * time.Hour)
 		}
 		err = batch.Send()
+		if err != nil {
+			return err
+		}
+		err = batch2.Send()
 		if err != nil {
 			return err
 		}
